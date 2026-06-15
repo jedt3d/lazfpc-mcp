@@ -16,32 +16,36 @@ implementation
 uses
   Process;
 
+function setenv(name, value: PChar; overwrite: LongInt): LongInt; cdecl; external 'c' name 'setenv';
+
 function RunLazBuild(const ALazBuildPath, AFPCPath, AFPCBinDir: string;
   const AProjectPath, ATargetOS, ATargetCPU: string;
   out AOutput, AStdErr: string): Boolean;
 var
   lProc: TProcess;
-  lOut, lErr: TStringList;
-  lCmd: string;
+  lBuf: string;
+  lOutStream, lErrStream: TMemoryStream;
+  lNewPath: string;
 begin
   AOutput := '';
   AStdErr := '';
   Result := False;
 
+  lNewPath := AFPCBinDir + ':' + GetEnvironmentVariable('PATH');
+  setenv('PATH', PChar(lNewPath), 1);
+
   lProc := TProcess.Create(nil);
-  lOut := TStringList.Create;
-  lErr := TStringList.Create;
+  lOutStream := TMemoryStream.Create;
+  lErrStream := TMemoryStream.Create;
   try
     lProc.Executable := ALazBuildPath;
     lProc.Parameters.Add('-B');
     lProc.Parameters.Add('--compiler=' + AFPCPath);
-    lProc.Parameters.Add(AProjectPath);
-
     if ATargetOS <> '' then
       lProc.Parameters.Add('--os=' + ATargetOS);
     if ATargetCPU <> '' then
       lProc.Parameters.Add('--cpu=' + ATargetCPU);
-
+    lProc.Parameters.Add(AProjectPath);
     lProc.Options := [poUsePipes, poNoConsole];
 
     try
@@ -54,25 +58,44 @@ begin
       end;
     end;
 
-    while lProc.Running or (lProc.Output.NumBytesAvailable > 0) do
+    while lProc.Running or (lProc.Output.NumBytesAvailable > 0) or (lProc.Stderr.NumBytesAvailable > 0) do
     begin
-      if lProc.Output.NumBytesAvailable > 0 then
+      while lProc.Output.NumBytesAvailable > 0 do
       begin
-        SetLength(lCmd, lProc.Output.NumBytesAvailable);
-        lProc.Output.Read(lCmd[1], Length(lCmd));
-        AOutput := AOutput + lCmd;
+        SetLength(lBuf, lProc.Output.NumBytesAvailable);
+        lProc.Output.Read(lBuf[1], Length(lBuf));
+        lOutStream.Write(lBuf[1], Length(lBuf));
       end;
-      Sleep(10);
+      while lProc.Stderr.NumBytesAvailable > 0 do
+      begin
+        SetLength(lBuf, lProc.Stderr.NumBytesAvailable);
+        lProc.Stderr.Read(lBuf[1], Length(lBuf));
+        lErrStream.Write(lBuf[1], Length(lBuf));
+      end;
+      if lProc.Running then
+        Sleep(10);
     end;
 
-    if lProc.ExitStatus = 0 then
-      Result := True;
+    lProc.WaitOnExit;
 
-    if lProc.ExitCode <> 0 then
-      AStdErr := Format('lazbuild exited with code %d', [lProc.ExitCode]);
+    if lOutStream.Size > 0 then
+    begin
+      SetLength(AOutput, lOutStream.Size);
+      lOutStream.Position := 0;
+      lOutStream.Read(AOutput[1], lOutStream.Size);
+    end;
+
+    if lErrStream.Size > 0 then
+    begin
+      SetLength(AStdErr, lErrStream.Size);
+      lErrStream.Position := 0;
+      lErrStream.Read(AStdErr[1], lErrStream.Size);
+    end;
+
+    Result := (lProc.ExitStatus = 0);
   finally
-    lOut.Free;
-    lErr.Free;
+    lOutStream.Free;
+    lErrStream.Free;
     lProc.Free;
   end;
 end;

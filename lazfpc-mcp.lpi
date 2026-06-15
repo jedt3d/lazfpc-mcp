@@ -39,7 +39,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="src/tools;src/utils;src/lsp"/>
+      <OtherUnitFiles Value="src/tools;src/utils;src/lsp;/Users/worajedt/Lazarus/mcp/Src/Base"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
