@@ -1,0 +1,35 @@
+# Binaries
+*.app
+*.exe
+*.dll
+*.dylib
+*.so
+*.o
+*.ppu
+*.a
+*.ppu
+*.compiled
+*.dbg
+
+# Lazarus IDE
+*.lps
+backup/
+lib/
+heaptrclog
+*.trp
+
+# macOS
+.DS_Store
+*.dSYM/
+
+# FPC
+fpc.cfg
+*.res
+
+# IDE
+*.kdev4
+*.swp
+*~
+
+# Test outputs
+tests/output/
