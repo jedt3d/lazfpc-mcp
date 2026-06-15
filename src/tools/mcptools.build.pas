@@ -5,19 +5,10 @@ unit mcptools.build;
 interface
 
 uses
-  Classes, SysUtils, fpjson, mcp.tools;
+  Classes, SysUtils, fpjson, mcp.types, mcp.tools;
 
 type
-  { TBuildProjectTool - Build a Lazarus .lpi project using lazbuild }
-
   TBuildProjectTool = class(TMCPTool)
-  private
-    FLazBuildPath: string;
-    FFPCPath: string;
-    FWorkspaceRoot: string;
-    function BuildProject(const AProjectPath: string;
-      ATargetOS, ATargetCPU: string; out AOutput: string): Boolean;
-    procedure ResolveEnvironment;
   public
     constructor create(const aName: string; const aDescription: string); override;
     procedure DoExecute(aInput: TJSONObject; aResult: TJSONObject); override;
@@ -43,20 +34,17 @@ begin
       'enum', TJSONArray.Create(['aarch64', 'x86_64'])]), False);
 end;
 
-procedure TBuildProjectTool.ResolveEnvironment;
-begin
-  FWorkspaceRoot := GetWorkspaceRoot;
-  FLazBuildPath := GetLazBuildPath;
-  FFPCPath := GetFPCPath;
-end;
-
 procedure TBuildProjectTool.DoExecute(aInput: TJSONObject; aResult: TJSONObject);
 var
-  lProjectPath, lTargetOS, lTargetCPU, lOutput: string;
+  lProjectPath, lTargetOS, lTargetCPU: string;
+  lOutput, lStdErr: string;
   lSuccess: Boolean;
+  lErrors: TBuildErrorArray;
+  lErrJSON: TJSONArray;
+  lErrorCount, lWarnCount, lNoteCount: Integer;
+  lErr: TBuildError;
+  lCombinedOutput: string;
 begin
-  ResolveEnvironment;
-
   lProjectPath := aInput.Get('project_path', '');
   lTargetOS := aInput.Get('target_os', '');
   lTargetCPU := aInput.Get('target_cpu', '');
@@ -64,15 +52,51 @@ begin
   if lProjectPath = '' then
     raise EMCPException.Create('project_path is required');
 
-  lSuccess := BuildProject(lProjectPath, lTargetOS, lTargetCPU, lOutput);
+  if not FileExists(lProjectPath) then
+    raise EMCPException.CreateFmt('Project file not found: %s', [lProjectPath]);
 
+  lSuccess := RunLazBuild(GetLazBuildPath, GetFPCPath, GetFPCBinDir,
+    lProjectPath, lTargetOS, lTargetCPU, lOutput, lStdErr);
+
+  lCombinedOutput := lOutput;
+  if lStdErr <> '' then
+    lCombinedOutput := lCombinedOutput + LineEnding + lStdErr;
+
+  // Parse compiler output for structured errors
+  lErrors := ParseCompilerOutput(lCombinedOutput);
+
+  // Count by severity
+  lErrorCount := 0;
+  lWarnCount := 0;
+  lNoteCount := 0;
+  for lErr in lErrors do
+  begin
+    if (lErr.Severity = 'error') then
+      Inc(lErrorCount)
+    else if lErr.Severity = 'warning' then
+      Inc(lWarnCount)
+    else if lErr.Severity = 'note' then
+      Inc(lNoteCount);
+  end;
+
+  // Build result
   aResult.Add('success', lSuccess);
   aResult.Add('project_path', lProjectPath);
   if lTargetOS <> '' then
     aResult.Add('target_os', lTargetOS);
   if lTargetCPU <> '' then
     aResult.Add('target_cpu', lTargetCPU);
-  aResult.Add('output', lOutput);
+
+  // Truncate output if very long
+  if Length(lCombinedOutput) > 50000 then
+    lCombinedOutput := Copy(lCombinedOutput, 1, 50000) + '... [truncated]';
+  aResult.Add('output', lCombinedOutput);
+
+  lErrJSON := ErrorsToJSON(lErrors);
+  aResult.Add('errors', lErrJSON);
+  aResult.Add('error_count', lErrorCount);
+  aResult.Add('warning_count', lWarnCount);
+  aResult.Add('note_count', lNoteCount);
 end;
 
 end.

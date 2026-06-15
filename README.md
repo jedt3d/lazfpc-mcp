@@ -30,21 +30,21 @@ The server uses `TMCPStdIOApplication` from the FPC MCP framework for stdio tran
 
 ## Tools
 
-### Phase 1 - Core (Implemented)
+### Phase 1 - Core
 
 | Tool | Description | Input | Output |
 |------|-------------|-------|--------|
 | `build_project` | Build a Lazarus .lpi project using lazbuild | `project_path`, `target_os`?, `target_cpu`? | success, output, errors[] |
 | `parse_lfm` | Parse a .lfm form file and return component tree | `lfm_path`, `max_depth`? | component tree JSON |
 
-### Phase 2 - Analysis & Testing (Skeleton)
+### Phase 2 - Analysis & Testing
 
 | Tool | Description | Input | Output |
 |------|-------------|-------|--------|
 | `parse_lpi` | Parse .lpi project file metadata | `lpi_path` | units[], dependencies[], options |
 | `run_fpcunit_tests` | Build and run FPCUnit test project | `test_project_path`, `suite_filter`? | pass/fail per test |
 
-### Phase 3 - Discovery (Skeleton)
+### Phase 3 - Discovery
 
 | Tool | Description | Input | Output |
 |------|-------------|-------|--------|
@@ -146,6 +146,7 @@ lazfpc-mcp/
       mcputils.pathconfig.pas # FPC version / PATH resolution
       mcputils.build.pas      # lazbuild CLI wrapper
       mcputils.errorparser.pas # FPC error message parser
+      mcputils.process.pas   # TProcess wrapper for running external programs
     lsp/                      # Future: CodeTools integration
   docs/
     lazfpc-mcp_plan.md     # Detailed implementation plan
@@ -169,15 +170,17 @@ See [docs/lazfpc-mcp_plan.md](docs/lazfpc-mcp_plan.md) for the full benchmarking
 
 ## Roadmap
 
-- [x] Phase 1: `build_project` and `parse_lfm` tools
-- [ ] Phase 1: Full FPC error parsing in `build_project`
-- [ ] Phase 1: Reuse existing LfmParser from lfm_layout_designer in `parse_lfm`
-- [ ] Phase 2: `parse_lpi` XML parsing implementation
-- [ ] Phase 2: `run_fpcunit_tests` with console runner integration
-- [ ] Phase 3: `search_fpc_help` with local documentation index
-- [ ] Phase 3: `list_projects` with recursive directory scanning
+- [x] Phase 1: `build_project` — full lazbuild integration with PATH resolution, error/warning parsing
+- [x] Phase 1: `parse_lfm` — full LFM parser with component tree, properties, layout summary, children
+- [x] Phase 1: FPC error parsing (file, line, column, severity, message extraction)
+- [x] Phase 2: `parse_lpi` — XML parsing with units, compiler options, search paths
+- [x] Phase 2: `run_fpcunit_tests` — build + run + parse FPCUnit output with pass/fail per test
+- [x] Phase 3: `search_fpc_help` — search FPC RTL/FCL/packages source for identifiers
+- [x] Phase 3: `list_projects` — recursive directory scanner for .lpi/.lpr/.lpk files
+- [x] All 6 tools implemented and compiling successfully
 - [ ] Future: CodeTools integration for code analysis tools
 - [ ] Future: Integration with pascal-language-server for LSP capabilities
+- [ ] Future: Automated test suite and benchmarking
 
 ## Contributing
 
